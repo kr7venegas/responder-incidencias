@@ -18,21 +18,38 @@ COORD_FECHA_FIN       = (680, 72)
 COORD_BOTON_CONSULTAR = (93, 74)
 COORD_BOTON_INSERTAR  = (937, 727)
 COORD_CAMPO_ESTADO    = (800, 600)
+COORD_ZONA_MUERTA = (345, 79)
+COORD_CODIGO = (1106, 73)
+COORD_ESTADO = (1128, 167)
+COORD_FINALIZADA = (939, 269)
+COORD_ACEPTAR = (982, 77)
 
 # --- FUNCIONES DE CLICK POR COORDENADAS ---
 
 def click_absoluto(driver, wait, x, y, descripcion=""):
     try:
-        # Aseguramos que el body esté presente antes de actuar
         wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
         actions = ActionChains(driver)
-        # Click relativo al inicio de la página
+        
+        # 1. MOVER A ZONA MUERTA PRIMERO (Para quitar cualquier hover previo)
+        # Suponiendo que (10, 500) es un sitio seguro
+        actions.move_by_offset(10, 500).perform() 
+        time.sleep(0.2) # Pausa mínima para que el menú se cierre
+        
+        # 2. VOLVER AL ORIGEN (0,0) desde la zona muerta
+        actions.move_by_offset(-10, -500).perform()
+
+        # 3. AHORA SÍ, IR AL OBJETIVO Y CLICAR
         actions.move_by_offset(x, y).click().perform()
-        # Reset ratón
+        
+        # 4. RESET Y APARTAR (Para no dejar el ratón encima del botón recién pulsado)
         actions.move_by_offset(-x, -y).perform()
-        print(f"🖱️ Click ejecutado en ({x}, {y}) - {descripcion}")
+        actions.move_by_offset(10, 500).perform()
+        actions.move_by_offset(-10, -500).perform() # Reset para la siguiente función
+        
+        print(f"🖱️ Click limpio en ({x}, {y}) - {descripcion}")
     except Exception as e:
-        print(f"❌ Error al hacer click en {descripcion}: {e}")
+        print(f"❌ Error en {descripcion}: {e}")
 
 def escribir_texto_en_posicion(driver, wait, x, y, texto, descripcion=""):
     try:
@@ -61,9 +78,11 @@ def escribir_texto_en_posicion(driver, wait, x, y, texto, descripcion=""):
 
 chrome_options = Options()
 chrome_options.add_argument("--start-maximized")
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
 chrome_options.add_experimental_option('useAutomationExtension', False)
+prefs = {"credentials_enable_service": False, "profile.password_manager_enabled": False}
+chrome_options.add_experimental_option("prefs", prefs)
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 wait = WebDriverWait(driver, 10)
 
 try:
@@ -89,7 +108,7 @@ try:
                 codigos_aviso.append(fila[0].strip())
 
     # 3. Fechas
-    hace_x_dias = datetime.now() - timedelta(days=3)
+    hace_x_dias = datetime.now() - timedelta(days=4)
     f_ini = hace_x_dias.strftime("%d/%m/%Y 00:00:00")
     f_fin = hace_x_dias.strftime("%d/%m/%Y 23:59:59")
 
@@ -102,6 +121,9 @@ try:
         escribir_texto_en_posicion(driver, wait, COORD_FECHA_INI[0], COORD_FECHA_INI[1], f_ini, "Fecha Inicio")
         time.sleep(1) # Pequeña pausa entre campos
         escribir_texto_en_posicion(driver, wait, COORD_FECHA_FIN[0], COORD_FECHA_FIN[1], f_fin, "Fecha Fin")
+        time.sleep(1) # Pequeña pausa entre campos
+        #Código
+        escribir_texto_en_posicion(driver, wait, COORD_CODIGO[0], COORD_CODIGO[1], cod, "Código")
 
         # Paso B: Click en Consultar
         click_absoluto(driver, wait, COORD_BOTON_CONSULTAR[0], COORD_BOTON_CONSULTAR[1], "Botón Consultar")
@@ -110,9 +132,12 @@ try:
         # Paso C: Click en Insertar
         click_absoluto(driver, wait, COORD_BOTON_INSERTAR[0], COORD_BOTON_INSERTAR[1], "Botón Insertar")
         time.sleep(2) 
-
-        # Paso D: Escribir 999 en el Estado
-        escribir_texto_en_posicion(driver, wait, COORD_CAMPO_ESTADO[0], COORD_CAMPO_ESTADO[1], "999", "Campo Estado")
+        click_absoluto(driver, wait, COORD_ESTADO[0], COORD_ESTADO[1], "Botón Estado")
+        time.sleep(2) 
+        click_absoluto(driver, wait, COORD_FINALIZADA[0], COORD_FINALIZADA[1], "Botón Finalizada")
+        time.sleep(2) 
+        click_absoluto(driver, wait, COORD_ACEPTAR[0], COORD_ACEPTAR[1], "Botón Aceptar")
+        time.sleep(2) 
         
         print(f"✅ Proceso completado para {cod}.")
         time.sleep(2)
