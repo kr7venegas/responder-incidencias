@@ -5,94 +5,77 @@ from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.action_chains import ActionChains
+from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
-from webdriver_manager.chrome import ChromeDriverManager
 
-# --- CONFIGURACIÓN DE FUNCIONES ---
+# --- CONFIGURACIÓN DE COORDENADAS ---
+COORD_FECHA_INI       = (536, 72)
+COORD_FECHA_FIN       = (680, 72)
+COORD_BOTON_CONSULTAR = (93, 74)
+COORD_BOTON_INSERTAR  = (937, 727)
+COORD_CAMPO_ESTADO    = (800, 600)
 
-def preparar_contexto(driver, wait):
-    """Busca los componentes de la web en el nivel principal o en iframes."""
-    driver.switch_to.default_content()
+# --- FUNCIONES DE CLICK POR COORDENADAS ---
+
+def click_absoluto(driver, wait, x, y, descripcion=""):
     try:
-        # Intentamos ver si los componentes están en el nivel principal
-        wait.until(EC.presence_of_element_located((By.TAG_NAME, "input-date")))
-        return True
-    except:
-        # Si no, buscamos en el primer iframe
-        iframes = driver.find_elements(By.TAG_NAME, "iframe")
-        for i in range(len(iframes)):
-            driver.switch_to.default_content()
-            driver.switch_to.frame(i)
-            try:
-                WebDriverWait(driver, 3).until(EC.presence_of_element_located((By.TAG_NAME, "input-date")))
-                return True
-            except:
-                continue
-    return False
-
-def rellenar_fechas_shadow(driver, inicio, fin):
-    try:
-        shadow_host = driver.find_element(By.NAME, "dat_inc")
-        script = f"""
-            const root = arguments[0].shadowRoot;
-            const inputFrom = root.querySelector('input[from]');
-            const inputTo = root.querySelector('input[to]');
-            inputFrom.value = '{inicio}';
-            inputFrom.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            inputTo.value = '{fin}';
-            inputTo.dispatchEvent(new Event('input', {{ bubbles: true }}));
-        """
-        driver.execute_script(script, shadow_host)
-        print(f"✅ Fechas set: {inicio}")
+        # Aseguramos que el body esté presente antes de actuar
+        wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        actions = ActionChains(driver)
+        # Click relativo al inicio de la página
+        actions.move_by_offset(x, y).click().perform()
+        # Reset ratón
+        actions.move_by_offset(-x, -y).perform()
+        print(f"🖱️ Click ejecutado en ({x}, {y}) - {descripcion}")
     except Exception as e:
-        print(f"❌ Error fechas: {e}")
+        print(f"❌ Error al hacer click en {descripcion}: {e}")
 
-def escribir_codigo_incidencia(driver, valor_codigo):
-    """Inyecta el código en el campo Filtrar usando JavaScript para evitar bloqueos."""
+def escribir_texto_en_posicion(driver, wait, x, y, texto, descripcion=""):
     try:
-        # Buscamos el input que contiene 'iltrar' en el placeholder
-        selector_filtrar = "input[placeholder*='iltrar']"
-        campo_filtro = driver.find_element(By.CSS_SELECTOR, selector_filtrar)
-
-        # Inyección directa por JS
-        script = """
-            arguments[0].value = arguments[1];
-            arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
-            arguments[0].dispatchEvent(new Event('change', { bubbles: true }));
-            arguments[0].dispatchEvent(new Event('keyup', { bubbles: true }));
-        """
-        driver.execute_script(script, campo_filtro, valor_codigo)
-        print(f"✅ Código {valor_codigo} inyectado en filtro.")
+        wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+        actions = ActionChains(driver)
+        
+        # 1. Click para dar foco
+        actions.move_by_offset(x, y).click().perform()
+        time.sleep(0.3)
+        
+        # 2. LIMPIAR el campo (Seleccionar todo y borrar)
+        # Usamos CONTROL + A y BACKSPACE para asegurar que el campo esté vacío
+        actions.key_down(Keys.CONTROL).send_keys('a').key_up(Keys.CONTROL).perform()
+        actions.send_keys(Keys.BACKSPACE).perform()
+        
+        # 3. Escribir el nuevo texto
+        actions.send_keys(texto).send_keys(Keys.ENTER).perform()
+        
+        # 4. Reset ratón
+        actions.move_by_offset(-x, -y).perform()
+        print(f"✍️ Texto '{texto}' enviado a {descripcion}")
     except Exception as e:
-        print(f"❌ Error inyectando código: {e}")
-
-def pulsar_boton_consultar(driver):
-    try:
-        shadow_host = driver.find_element(By.TAG_NAME, "query-button")
-        script = "arguments[0].shadowRoot.querySelector('button').click();"
-        driver.execute_script(script, shadow_host)
-        print("🚀 Consulta lanzada.")
-    except Exception as e:
-        print(f"❌ Error botón consultar: {e}")
+        print(f"❌ Error al escribir en {descripcion}: {e}")
 
 # --- INICIO DEL SCRIPT ---
 
 chrome_options = Options()
 chrome_options.add_argument("--start-maximized")
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-wait = WebDriverWait(driver, 20)
+chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+chrome_options.add_experimental_option('useAutomationExtension', False)
+wait = WebDriverWait(driver, 10)
 
 try:
     # 1. Login
     driver.get("https://portal.fccma.com/vision/#/ma_prc_609_300/INC/93545/1")
-    wait.until(EC.presence_of_element_located((By.NAME, "username"))).send_keys("su_granada")
+    
+    user_input = wait.until(EC.element_to_be_clickable((By.NAME, "username")))
+    user_input.send_keys("su_granada")
     driver.find_element(By.NAME, "password").send_keys("Inagra_2025")
     driver.find_element(By.CSS_SELECTOR, "button[type='submit']").click()
-    print("Sesión iniciada. Esperando carga del portal...")
-    time.sleep(8) # Tiempo para que cargue el dashboard tras login
+    
+    print("Sesión iniciada. Esperando carga...")
 
     # 2. Cargar CSV
     directorio = os.path.dirname(os.path.abspath(__file__))
@@ -105,30 +88,36 @@ try:
             if fila and fila[0].strip().isdigit():
                 codigos_aviso.append(fila[0].strip())
 
-    # 3. Fechas (Ayer)
-    ayer = datetime.now() - timedelta(days=1)
-    f_ini = ayer.strftime("%d/%m/%Y 00:00:00")
-    f_fin = ayer.strftime("%d/%m/%Y 23:59:59")
+    # 3. Fechas
+    hace_x_dias = datetime.now() - timedelta(days=3)
+    f_ini = hace_x_dias.strftime("%d/%m/%Y 00:00:00")
+    f_fin = hace_x_dias.strftime("%d/%m/%Y 23:59:59")
 
     # 4. Bucle de Procesamiento
-    if preparar_contexto(driver, wait):
-        for cod in codigos_aviso:
-            print(f"\n--- TRABAJANDO CON CÓDIGO: {cod} ---")
-            
-            # Limpiar posibles filtros anteriores pulsando ESC
-            driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
-            
-            rellenar_fechas_shadow(driver, f_ini, f_fin)
-            escribir_codigo_incidencia(driver, cod)
-            pulsar_boton_consultar(driver)
-            
-            # Esperamos a que la tabla se refresque
-            print(f"Esperando resultados de {cod}...")
-            time.sleep(6) 
-    else:
-        print("No se encontró el formulario de búsqueda.")
+    for cod in codigos_aviso:
+        print(f"\n--- TRABAJANDO CON CÓDIGO: {cod} ---")
+        time.sleep(10)
+        
+        # Paso A: Fechas
+        escribir_texto_en_posicion(driver, wait, COORD_FECHA_INI[0], COORD_FECHA_INI[1], f_ini, "Fecha Inicio")
+        time.sleep(1) # Pequeña pausa entre campos
+        escribir_texto_en_posicion(driver, wait, COORD_FECHA_FIN[0], COORD_FECHA_FIN[1], f_fin, "Fecha Fin")
+
+        # Paso B: Click en Consultar
+        click_absoluto(driver, wait, COORD_BOTON_CONSULTAR[0], COORD_BOTON_CONSULTAR[1], "Botón Consultar")
+        time.sleep(3) 
+
+        # Paso C: Click en Insertar
+        click_absoluto(driver, wait, COORD_BOTON_INSERTAR[0], COORD_BOTON_INSERTAR[1], "Botón Insertar")
+        time.sleep(2) 
+
+        # Paso D: Escribir 999 en el Estado
+        escribir_texto_en_posicion(driver, wait, COORD_CAMPO_ESTADO[0], COORD_CAMPO_ESTADO[1], "999", "Campo Estado")
+        
+        print(f"✅ Proceso completado para {cod}.")
+        time.sleep(2)
 
 except Exception as e:
-    print(f"Error general en el sistema: {e}")
+    print(f"❌ Error general: {e}")
 
-# driver.quit() # Descomenta si quieres que se cierre solo al terminar
+# driver.quit()
