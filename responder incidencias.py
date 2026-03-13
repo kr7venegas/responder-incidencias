@@ -22,6 +22,8 @@ COORD_ZONA_MUERTA = (345, 79)
 COORD_CODIGO = (1106, 73)
 COORD_ESTADO = (1128, 167)
 COORD_FINALIZADA = (939, 269)
+COOR_EQUIPO = (1127, 190)
+COORD_ENCARGADO_GENERAL = (953, 234)
 COORD_ACEPTAR = (982, 77)
 
 # --- FUNCIONES DE CLICK POR COORDENADAS ---
@@ -136,6 +138,10 @@ try:
         time.sleep(2) 
         click_absoluto(driver, wait, COORD_FINALIZADA[0], COORD_FINALIZADA[1], "Botón Finalizada")
         time.sleep(2) 
+        click_absoluto(driver, wait, COOR_EQUIPO[0], COOR_EQUIPO[1], "Botón Equipo")
+        time.sleep(2)
+        click_absoluto(driver, wait, COORD_ENCARGADO_GENERAL[0], COORD_ENCARGADO_GENERAL[1], "Botón Encargado General")
+        time.sleep(2)
         click_absoluto(driver, wait, COORD_ACEPTAR[0], COORD_ACEPTAR[1], "Botón Aceptar")
         time.sleep(2) 
         
